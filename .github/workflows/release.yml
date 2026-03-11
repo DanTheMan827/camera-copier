@@ -15,10 +15,6 @@ jobs:
             rid: linux-x64
           - os: windows-latest
             rid: win-x64
-          - os: macos-13
-            rid: osx-x64
-          - os: macos-latest
-            rid: osx-arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -74,43 +70,65 @@ jobs:
           name: camera-copier-${{ matrix.rid }}
           path: camera-copier-${{ matrix.rid }}.zip
 
-  macos-universal:
-    needs: build
+  macos:
     runs-on: macos-latest
 
     permissions:
       contents: read
 
     steps:
-      - name: Download osx-x64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: camera-copier-osx-x64
-          path: osx-x64-zip/
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Download osx-arm64 artifact
-        uses: actions/download-artifact@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          name: camera-copier-osx-arm64
-          path: osx-arm64-zip/
+          dotnet-version: '10.0.x'
 
-      - name: Extract archives
+      - name: Extract version from tag
+        id: version
+        shell: bash
         run: |
-          unzip -o osx-x64-zip/camera-copier-osx-x64.zip -d osx-x64/
-          unzip -o osx-arm64-zip/camera-copier-osx-arm64.zip -d osx-arm64/
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Run tests
+        run: dotnet test --no-restore --verbosity normal
+
+      - name: Publish AOT (osx-arm64)
+        run: >
+          dotnet publish src/CameraCopier/CameraCopier.csproj
+          --configuration Release
+          --runtime osx-arm64
+          -p:PublishAot=true
+          -p:Version=${{ steps.version.outputs.version }}
+          --output publish/osx-arm64/
+
+      - name: Publish AOT (osx-x64)
+        run: >
+          dotnet publish src/CameraCopier/CameraCopier.csproj
+          --configuration Release
+          --runtime osx-x64
+          -p:PublishAot=true
+          -p:Version=${{ steps.version.outputs.version }}
+          --output publish/osx-x64/
 
       - name: Create universal binary
         run: |
-          mkdir -p universal/
-          cp -r osx-x64/. universal/
-          lipo -create osx-x64/CameraCopier osx-arm64/CameraCopier \
-               -output universal/CameraCopier
-          chmod +x universal/CameraCopier
+          mkdir -p publish/osx-universal/
+          cp -r publish/osx-arm64/. publish/osx-universal/
+          lipo -create publish/osx-arm64/CameraCopier publish/osx-x64/CameraCopier \
+               -output publish/osx-universal/CameraCopier
+          chmod +x publish/osx-universal/CameraCopier
 
       - name: Archive universal binary
         run: |
-          cd universal
-          zip -r ../camera-copier-osx-universal.zip .
+          cd publish/osx-universal
+          zip -r ../../camera-copier-osx-universal.zip .
 
       - name: Upload universal artifact
         uses: actions/upload-artifact@v4
@@ -119,7 +137,7 @@ jobs:
           path: camera-copier-osx-universal.zip
 
   release:
-    needs: [build, macos-universal]
+    needs: [build, macos]
     runs-on: ubuntu-latest
 
     permissions:
