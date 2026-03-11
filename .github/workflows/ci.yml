@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build (Debug)
+        run: dotnet build --configuration Debug --no-restore
+
+      - name: Build (Release)
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Upload Debug artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-copier-debug
+          path: src/CameraCopier/bin/Debug/net10.0/
+          retention-days: 7
+
+      - name: Upload Release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-copier-release
+          path: src/CameraCopier/bin/Release/net10.0/
+          retention-days: 7
+
+      - name: Run tests
+        run: dotnet test --no-restore --verbosity normal
