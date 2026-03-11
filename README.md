@@ -74,7 +74,7 @@ dotnet run --project src/CameraCopier
 
 ### Published binary
 
-Download the latest release for your platform from the [Releases](../../releases) page, extract, and run:
+Download the latest release for your platform from the [Releases](https://github.com/DanTheMan827/camera-copier/releases) page, extract, and run:
 
 ```bash
 ./CameraCopier   # Linux / macOS
