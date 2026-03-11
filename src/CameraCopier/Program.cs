@@ -19,7 +19,11 @@ internal static class Program
         var host = Host.CreateDefaultBuilder(args)
             .ConfigureServices((context, services) =>
             {
+#pragma warning disable IL2026, IL3050
+                // AppSettings only contains primitive types and List<string>;
+                // the reflective binder handles these correctly at AOT runtime.
                 services.Configure<AppSettings>(context.Configuration);
+#pragma warning restore IL2026, IL3050
 
                 services.AddSingleton<IProcessingQueue, ProcessingQueue>();
                 services.AddSingleton<IProcessedHashStore, ProcessedHashStore>();

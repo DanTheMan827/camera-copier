@@ -5,11 +5,19 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Enable AOT analysis during regular builds so issues are caught early -->
+    <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="MetadataExtractor" Version="2.9.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.4" />
+  </ItemGroup>
+
+  <!-- Keep MetadataExtractor and XmpCore assembly roots for AOT -->
+  <ItemGroup Condition="'$(PublishAot)' == 'true'">
+    <TrimmerRootAssembly Include="MetadataExtractor" />
+    <TrimmerRootAssembly Include="XmpCore" />
   </ItemGroup>
 
   <ItemGroup>

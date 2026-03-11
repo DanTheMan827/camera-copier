@@ -16,6 +16,13 @@ internal class ProcessedHashData
 }
 
 /// <summary>
+/// Source-generated JSON serializer context for AOT-compatible serialization.
+/// </summary>
+[JsonSerializable(typeof(ProcessedHashData))]
+[JsonSourceGenerationOptions(WriteIndented = true)]
+internal partial class ProcessedHashStoreContext : JsonSerializerContext { }
+
+/// <summary>
 /// Manages the set of file hashes that have already been processed.
 /// </summary>
 public interface IProcessedHashStore
@@ -40,11 +47,6 @@ public class ProcessedHashStore : IProcessedHashStore
     private HashSet<string> _hashes = [];
     private readonly SemaphoreSlim _lock = new(1, 1);
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = true
-    };
-
     /// <summary>
     /// Initializes a new instance of <see cref="ProcessedHashStore"/>.
     /// </summary>
@@ -67,7 +69,7 @@ public class ProcessedHashStore : IProcessedHashStore
         try
         {
             await using var stream = File.OpenRead(_filePath);
-            var data = await JsonSerializer.DeserializeAsync<ProcessedHashData>(stream, JsonOptions, cancellationToken);
+            var data = await JsonSerializer.DeserializeAsync(stream, ProcessedHashStoreContext.Default.ProcessedHashData, cancellationToken);
             _hashes = data?.ProcessedHashes ?? [];
             _logger.LogInformation("Loaded {Count} processed hashes from {Path}.", _hashes.Count, _filePath);
         }
@@ -104,7 +106,7 @@ public class ProcessedHashStore : IProcessedHashStore
         {
             await using (var stream = File.Create(tempPath))
             {
-                await JsonSerializer.SerializeAsync(stream, data, JsonOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, data, ProcessedHashStoreContext.Default.ProcessedHashData, cancellationToken);
             }
             File.Move(tempPath, _filePath, overwrite: true);
             _logger.LogDebug("Persisted {Count} hashes to {Path}.", _hashes.Count, _filePath);

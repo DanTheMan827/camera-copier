@@ -5,7 +5,20 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-13
+            rid: osx-x64
+          - os: macos-latest
+            rid: osx-arm64
+
+    runs-on: ${{ matrix.os }}
 
     permissions:
       contents: read
@@ -28,17 +41,55 @@ jobs:
       - name: Build (Release)
         run: dotnet build --configuration Release --no-restore
 
-      - name: Upload Debug artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: camera-copier-debug
-          path: src/CameraCopier/bin/Debug/net10.0/
-
-      - name: Upload Release artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: camera-copier-release
-          path: src/CameraCopier/bin/Release/net10.0/
-
       - name: Run tests
         run: dotnet test --no-restore --verbosity normal
+
+      - name: Publish AOT
+        run: >
+          dotnet publish src/CameraCopier/CameraCopier.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          -p:PublishAot=true
+          --output publish/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-copier-${{ matrix.rid }}
+          path: publish/
+          retention-days: 7
+
+  macos-universal:
+    needs: build-and-test
+    runs-on: macos-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download osx-x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: camera-copier-osx-x64
+          path: osx-x64/
+
+      - name: Download osx-arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: camera-copier-osx-arm64
+          path: osx-arm64/
+
+      - name: Create universal binary
+        run: |
+          mkdir -p universal/
+          cp -r osx-x64/. universal/
+          lipo -create osx-x64/CameraCopier osx-arm64/CameraCopier \
+               -output universal/CameraCopier
+          chmod +x universal/CameraCopier
+
+      - name: Upload universal artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: camera-copier-osx-universal
+          path: universal/
+          retention-days: 7
